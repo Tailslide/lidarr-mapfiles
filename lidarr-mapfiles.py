@@ -152,27 +152,47 @@ for trackFile in unmappedFiles:
                         rg = findReleaseGroupInArtist(foundartist, albumNameFromPath)
                         if (rg is None): rg = findReleaseGroupInArtist(foundartist, albumNameNoParen)
                         if (rg is not None):
-                            print("\t**Found Album in MB but not Lidarr")
-                            rels=mb.getReleasesByReleaseGroupId(rg['id'])
-                            for rel in rels["release-list"]:
-                                if ("status" not in rel):
-                                    print("\t**Found Release group with unknown releases.. popping up browser for user to set")
-                                    # no documented api to update release... pop up browser for user to edit
-                                    url = "https://musicbrainz.org/release/" + str(rel["id"] + "/edit")
-                                    webbrowser.open(url, new=0, autoraise=True)
+                            print("\t**Found Album in MB but not Lidarr id = lidarr:" + str(rg['id']))
+                            album = getSearchResultByGuid(str(rg['id']))
+                            if (album is not None):
+                                album["addOptions"] = { "searchForNewAlbum": False }
+                                bestfoundalbum=addAlbum(album)
+                            else:
+                                rels=mb.getReleasesByReleaseGroupId(rg['id'])
+                                for rel in rels["release-list"]:
+                                    if ("status" not in rel):
+                                        print("\t**Found Release group with unknown releases.. popping up browser for user to set")
+                                        # no documented api to update release... pop up browser for user to edit
+                                        url = "https://musicbrainz.org/release/" + str(rel["id"] + "/edit")
+                                        webbrowser.open(url, new=0, autoraise=True)
                         else:
                             
                             if (MOVEUNKNOWNALBUMSTOSUBFOLDER is not None and MOVEUNKNOWNALBUMSTOSUBFOLDER != ""):
                                 ufolder = os.path.join(fullalbumpath, "..", MOVEUNKNOWNALBUMSTOSUBFOLDER)
-                                #if (yearFromPath is not None and str(yearFromPath).strip() != ''):
-                                #    ufolder=os.path.join(ufolder, " (" + str(yearFromPath) + ")")
+
+                                # if (MOVEUNKNOWNALBUMSTOSUBFOLDER not in fullalbumpath): # don't move twice
+                                #     print("\tMOVING ALBUM TO " + ufolder + " SUBFOLDER")
+                                #     if not os.path.exists(ufolder):
+                                #         os.mkdir(ufolder)
+                                #     shutil.move(fullalbumpath, ufolder)
 
 
-                                if (MOVEUNKNOWNALBUMSTOSUBFOLDER not in fullalbumpath): # don't move twice
-                                    print("\tMOVING ALBUM TO " + ufolder + " SUBFOLDER")
-                                    if not os.path.exists(ufolder):
-                                        os.mkdir(ufolder)
-                                    shutil.move(fullalbumpath, ufolder)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
                             #lartist = getSearchResultByGuid(rg['id'])
                             #rg = addAlbum(rg)
