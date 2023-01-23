@@ -1,6 +1,7 @@
 import difflib
 import os
 import shutil
+from pathlib import Path
 import unicodedata
 import mb
 from datetime import datetime
@@ -22,6 +23,9 @@ artists = getArtists()
 ROOTFOLDERPATH = os.getenv('ROOTFOLDERPATH')
 LOCALFOLDERPATH= os.getenv('LOCALFOLDERPATH')
 MOVEUNKNOWNALBUMSTOSUBFOLDER= os.getenv('MOVEUNKNOWNALBUMSTOSUBFOLDER')
+REMOVEM4AIFMP3= (os.getenv('REMOVEM4AIFMP3') == "True")
+REMOVEWMAIFOTHER=  (os.getenv('REMOVEWMAIFOTHER') == "True")
+REMOVEANYIFFLAC=  (os.getenv('REMOVEANYIFFLAC') == "True")
 #somehow we get a triple backslash on the beginning
 #LOCALFOLDERPATH = LOCALFOLDERPATH.replace("\\\\\\","\\\\")
 curalbum = 0
@@ -30,6 +34,32 @@ artistAlbums ={}
 
 releaseKeys = set()
 albumReleaseGroups = {}
+#remove dupes
+# for root, subdirs, files in os.walk(LOCALFOLDERPATH):
+#     for filename in files:
+#         file_path = os.path.join(root, filename)
+#         removefile=False
+#         localfileext= str(os.path.splitext(file_path)[1])
+#         localfilenoext= str(os.path.splitext(file_path)[0])
+#         ismp3 = (localfileext.lower() == ".mp3")
+#         ism4a = (localfileext.lower() == ".m4a")
+#         ism4p =  (localfileext.lower() == ".m4p") #lidarr doesn't like m4ps
+#         iswav = (localfileext.lower() == ".wav")
+#         iswma = (localfileext.lower() == ".wma")
+#         isflac = (localfileext.lower() == ".flac")
+
+#         hasmp3 = os.path.exists(localfilenoext + ".mp3")
+#         hasm4a = os.path.exists(localfilenoext + ".m4a")
+#         hasflac = os.path.exists(localfilenoext + ".flac")
+#         haswma = os.path.exists(localfilenoext + ".wma")
+#         haswav = os.path.exists(localfilenoext + ".wav")
+
+#         removefile =(REMOVEANYIFFLAC and not isflac and hasflac) or  \
+#                     (REMOVEWMAIFOTHER and (iswav or iswma) and (hasmp3 or hasm4a or hasflac)) or \
+#                     (REMOVEM4AIFMP3 and (ism4a or ism4p) and hasmp3)
+#         if (removefile):
+#             print("Removing file:" + file_path + " because a better version exists")
+#             os.remove(file_path)
 
 for trackFile in unmappedFiles:
     curalbum +=1
@@ -39,7 +69,6 @@ for trackFile in unmappedFiles:
     if (not os.path.exists(localfile)):
         print("File does not exists you may need to have lidarr rescan:" + localfile)
     else:
-
         yearFromPath = getYearFromPath(trackFile["path"])
         artistNameFromPath = getArtistFromPath(trackFile["path"])
         albumNameFromPath = getAlbumFromPath(trackFile["path"])
@@ -50,7 +79,7 @@ for trackFile in unmappedFiles:
         key = albumNameFromPath + " {album}: " + artistNameFromPath + " {artist}"
         if key not in albumKeys:  #only process first track from each album
             albumKeys.add(key)
-            searchresults = getSearchResults(albumNameFromPath, artistNameFromPath)
+            #searchresults = getSearchResults(albumNameFromPath, artistNameFromPath)
             curres = 0
             bestfoundalbum = None
 
@@ -145,7 +174,7 @@ for trackFile in unmappedFiles:
                 else:
 
                     if (bestfoundalbum is None):
-                        print("\t**ALBUM not found *** Name From File:" + albumNameFromPath + " Artist From File:" + artistNameFromPath + " Lidarr Artist:" + foundartist["artistName"])
+                        print("\t**ALBUM not found *** Name From File:" + albumNameFromPath + " Artist From File:" + artistNameFromPath + " Lidarr Artist:" + foundartist["artistName"] + " Local file:" + localfile)
 
                         artistwithreleases = mb.getArtistAlbums(foundartist)
                         if (artistwithreleases is not None): foundartist=artistwithreleases
@@ -166,82 +195,40 @@ for trackFile in unmappedFiles:
                                         url = "https://musicbrainz.org/release/" + str(rel["id"] + "/edit")
                                         webbrowser.open(url, new=0, autoraise=True)
                         else:
+                            searchresults = getSearchResults(albumNameFromPath, artistNameFromPath)
+                            for searchres in searchresults:
+                                if ("album" in searchres):
+                                    foundalbum = True
+                                    bestfoundalbum = searchres["album"]
+                                    foundartist = bestfoundalbum["artist"]
+                                    if ("id" in bestfoundalbum):
+                                        #print("\tFound Imported Album:" +bestfoundalbum["title"] + " Artist: " + foundartist["artistName"] + " id:", bestfoundalbum["id"] )
+                                        break
+                                    if ("id" in foundartist and foundartist["id"] != artistId):
+                                        break # artist doesnt match skip
+                                    else:
+                                        artistscore =difflib.SequenceMatcher(a=foundartist["artistName"].lower(), b=artistNameFromPath.lower())
+                                        albumscore =difflib.SequenceMatcher(a=bestfoundalbum["title"].lower(), b=albumNameFromPath.lower())
+                                        artistmatch = artistscore.ratio() > 0.7
+                                        albumMatch = albumscore.ratio() > 0.7
+                                        matchstr = ""
+                                        if (artistmatch and albumMatch):
+                                            bestfoundalbum["addOptions"] = { "searchForNewAlbum": False }
+                                            print("Added album ", bestfoundalbum["title"])
+                                            bestfoundalbum=addAlbum(bestfoundalbum)
+                            #             if (albumMatch and not artistmatch): matchstr ="**ALBUM MATCH** "
+                            #             if (not albumMatch and artistmatch): matchstr ="**ARTIST MATCH** "
+                            #             if (albumMatch and artistmatch): matchstr ="**MATCH** "
+                            #             if (albumMatch and artistmatch):
                             
-                            if (MOVEUNKNOWNALBUMSTOSUBFOLDER is not None and MOVEUNKNOWNALBUMSTOSUBFOLDER != ""):
-                                ufolder = os.path.join(fullalbumpath, "..", MOVEUNKNOWNALBUMSTOSUBFOLDER)
-
-                                # if (MOVEUNKNOWNALBUMSTOSUBFOLDER not in fullalbumpath): # don't move twice
-                                #     print("\tMOVING ALBUM TO " + ufolder + " SUBFOLDER")
-                                #     if not os.path.exists(ufolder):
-                                #         os.mkdir(ufolder)
-                                #     shutil.move(fullalbumpath, ufolder)
 
 
+                            # if (MOVEUNKNOWNALBUMSTOSUBFOLDER is not None and MOVEUNKNOWNALBUMSTOSUBFOLDER != ""):
+                            #     ufolder = os.path.join(fullalbumpath, "..", MOVEUNKNOWNALBUMSTOSUBFOLDER)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                            #lartist = getSearchResultByGuid(rg['id'])
-                            #rg = addAlbum(rg)
-                            #print(rg)
-            #break
-        # for searchres in searchresults:
-        #     if ("album" in searchres):
-        #         foundalbum = True
-        #         bestfoundalbum = searchres["album"]
-        #         foundartist = bestfoundalbum["artist"]
-        #         if ("id" in bestfoundalbum):
-        #             #print("\tFound Imported Album:" +bestfoundalbum["title"] + " Artist: " + foundartist["artistName"] + " id:", bestfoundalbum["id"] )
-        #             break
-        #         if (foundartist["id"] != artistId):
-        #             break # artist doesnt match skip
-        #         else:
-        #             if (not printedAlbum):
-        #                 print("Searching Unimported Artist:" + artist + " Album:" + albumName + " Year:", year, "Artist Id:", artistId) #, end = '')
-        #                 printedAlbum = True
-        #             #print(" Checking UnImported Album:" +bestfoundalbum["title"] + " Artist: " + foundartist["artistName"] + " id:", bestfoundalbum["id"] )
-        #             artistscore =difflib.SequenceMatcher(a=foundartist["artistName"].lower(), b=artist.lower())
-        #             albumscore =difflib.SequenceMatcher(a=bestfoundalbum["title"].lower(), b=albumName.lower())
-        #             artistmatch = artistscore.ratio() > 0.7
-        #             albumMatch = albumscore.ratio() > 0.7
-        #             matchstr = ""
-        #             if (albumMatch and not artistmatch): matchstr ="**ALBUM MATCH** "
-        #             if (not albumMatch and artistmatch): matchstr ="**ARTIST MATCH** "
-        #             if (albumMatch and artistmatch): matchstr ="**MATCH** "
-        #             if (albumMatch and artistmatch):
-        #                 print("Artist:" + artist + " Album:" + albumName + " Year:", year) #, end = '')
-        #                 print("\t" + matchstr + "\tUnimported Album:" + bestfoundalbum["title"] + " Artist: " + foundartist["artistName"] + " Artist Score:",  artistscore.ratio(), " Album Score:", albumscore.ratio())
-        #             if (albumMatch and artistmatch):
-        #                 print("*** ADDING ALBUM TO LIDARR ***")
-        #                 bestfoundalbum["addOptions"] = { "searchForNewAlbum": False }
-                        # # " `"addOptions`":{`"searchForNewAlbum`":false}}"
-        #                 #print(bestfoundalbum)
-        #                 requrl = prefix + "album"
-        #                 response = requests.post(requrl,  headers=requestheaders, json=bestfoundalbum)
-        #                 if (not response.ok):
-        #                     print("Error adding record ", response.reason)
-        #                 else:
-        #                     print(response.json())
-
-        #                 break
-        #     if (foundalbum):
-        #         curres +=1
-        #     if (curres > 999):
-        #         break
-        # if (curalbum > 99999):
-        #     break
-
+                            #     if (MOVEUNKNOWNALBUMSTOSUBFOLDER not in fullalbumpath): # don't move twice
+                            #         print("\tMOVING ALBUM TO " + ufolder + " SUBFOLDER")
+                            #         if not os.path.exists(ufolder):
+                            #             os.mkdir(ufolder)
+                            #         shutil.move(fullalbumpath, ufolder)
 

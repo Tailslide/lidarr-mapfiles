@@ -88,7 +88,7 @@ def getSearchResultByGuid(guid):
         if ('artist' in resp[0]):
             return resp[0]['artist']
         if ('album' in resp[0]):
-            return resp[0]['albumn']
+            return resp[0]['album']
         else:    
             raise Exception("Lidarr should have returned artist or album but returned something else for MB ID:", guid) 
 
