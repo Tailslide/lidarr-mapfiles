@@ -35,9 +35,9 @@ def getLocalAlbumPathFromPath(path):
    album=splits[1]
    parsed = re.findall(r"^.*\(\d{4}\)",album)
    if (len(parsed) > 0):
-    return os.path.join(localfolder, parsed[0])
+    return os.path.join(localfolder, splits[0], parsed[0])
    else:
-    return os.path.join(localfolder, album)
+    return os.path.join(localfolder, splits[0], album)
 
 def _ireplace(old, new, text):
     idx = 0
