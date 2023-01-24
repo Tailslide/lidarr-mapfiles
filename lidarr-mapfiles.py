@@ -1,11 +1,13 @@
 import difflib
+import subprocess
 import os
 import shutil
 from pathlib import Path
 import unicodedata
 import mb
+from pathlib import PureWindowsPath   
 from datetime import datetime
-from lidarrapi import getUnmappedFiles, getSearchResults, getArtists
+from lidarrapi import getUnmappedFiles, getSearchResults, getArtists, pruneAlbumsWithNoDownloads
 from lidarrapi import getArtistAlbums,getSearchResultByGuid, addArtist, addAlbum
 from filepath import getAlbumFromPath, getArtistFromPath, getYearFromPath, getAlbumNoParenFromPath, getLocalAlbumPathFromPath, getLocalFileFromPath, WinSafePath, renameFolder
 from search import hasImportedResult, findArtistId, findArtistInCache, rankAlbum, goodAlbum, findReleaseGroupInArtist
@@ -17,9 +19,17 @@ import webbrowser
 #lartist = getSearchResultByGuid('fa7466b4-1521-482a-94f3-81b3c8b5b0b3')
 #lartist2= getSearchResultByGuid('debabff3-2559-46e5-862d-ef2a906d7010')
 
+artists = getArtists()
+
+# ## REMOVE VARIOUS ARTIST ALBUMS WITH NO TRACKS
+# for artist in artists:
+#     if (artist["artistName"] =="Various Artists"):
+#         variousArtistAlbums = getArtistAlbums(artist["id"])
+#         pruneAlbumsWithNoDownloads(variousArtistAlbums, artist["id"] )
+
 unmappedFiles = getUnmappedFiles()
 print("Unmapped File Count:" + str(len(unmappedFiles)))
-artists = getArtists()
+
 ROOTFOLDERPATH = os.getenv('ROOTFOLDERPATH')
 LOCALFOLDERPATH= os.getenv('LOCALFOLDERPATH')
 MOVEUNKNOWNALBUMSTOSUBFOLDER= os.getenv('MOVEUNKNOWNALBUMSTOSUBFOLDER')
@@ -34,7 +44,11 @@ artistAlbums ={}
 
 releaseKeys = set()
 albumReleaseGroups = {}
-#remove dupes
+
+
+
+badfolders = set()
+# #remove dupes
 # for root, subdirs, files in os.walk(LOCALFOLDERPATH):
 #     for filename in files:
 #         file_path = os.path.join(root, filename)
@@ -56,7 +70,7 @@ albumReleaseGroups = {}
 
 #         removefile =(REMOVEANYIFFLAC and not isflac and hasflac) or  \
 #                     (REMOVEWMAIFOTHER and (iswav or iswma) and (hasmp3 or hasm4a or hasflac)) or \
-#                     (REMOVEM4AIFMP3 and (ism4a or ism4p) and hasmp3)
+#                     (REMOVEM4AIFMP3 and (ism4a or ism4p) and hasmp3) # or ism4p
 #         if (removefile):
 #             print("Removing file:" + file_path + " because a better version exists")
 #             os.remove(file_path)
@@ -74,6 +88,9 @@ for trackFile in unmappedFiles:
         albumNameFromPath = getAlbumFromPath(trackFile["path"])
         albumNameNoParen = getAlbumNoParenFromPath(trackFile["path"])
         albumPath = getLocalAlbumPathFromPath(trackFile["path"])
+        if (albumPath not in badfolders):
+            badfolders.add(albumPath)
+
         if (albumNameNoParen.strip().lower() == "[unknown]"): 
             break
         key = albumNameFromPath + " {album}: " + artistNameFromPath + " {artist}"
@@ -174,7 +191,7 @@ for trackFile in unmappedFiles:
                 else:
 
                     if (bestfoundalbum is None):
-                        print("\t**ALBUM not found *** Name From File:" + albumNameFromPath + " Artist From File:" + artistNameFromPath + " Lidarr Artist:" + foundartist["artistName"] + " Local file:" + localfile)
+                        #print("\t**ALBUM not found *** Name From File:" + albumNameFromPath + " Artist From File:" + artistNameFromPath + " Lidarr Artist:" + foundartist["artistName"] + " Local file:" + localfile)
 
                         artistwithreleases = mb.getArtistAlbums(foundartist)
                         if (artistwithreleases is not None): foundartist=artistwithreleases
@@ -220,8 +237,11 @@ for trackFile in unmappedFiles:
                             #             if (not albumMatch and artistmatch): matchstr ="**ARTIST MATCH** "
                             #             if (albumMatch and artistmatch): matchstr ="**MATCH** "
                             #             if (albumMatch and artistmatch):
-                            
 
+print("Folders with unmatched files:")           
+for f in badfolders:
+    print(f)
+    subprocess.call(['explorer', PureWindowsPath(f)])
 
                             # if (MOVEUNKNOWNALBUMSTOSUBFOLDER is not None and MOVEUNKNOWNALBUMSTOSUBFOLDER != ""):
                             #     ufolder = os.path.join(fullalbumpath, "..", MOVEUNKNOWNALBUMSTOSUBFOLDER)

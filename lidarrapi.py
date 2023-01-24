@@ -61,6 +61,44 @@ def addArtist(newartist):
     else:
         return response.json()
 
+def getTrackFilesForArtist(artistId):
+    response = requests.get(prefix + "trackfile?artistId=" + str(artistId),   headers=requestheaders)
+    if (response.status_code != 200):
+        print("Error", response.status_code)
+        raise Exception("API Error", response) 
+    else:
+        return response.json()
+    
+def deleteAlbum(albumId):
+    response = requests.delete(prefix + "album/"+ str(albumId) + "?deleteFiles=false&addImportListExclusion=true",   headers=requestheaders)
+    if (response.status_code != 200):
+        print("Error", response.status_code)
+        raise Exception("API Error", response) 
+    else:
+        return True
+
+def pruneAlbumsWithNoDownloads(albums, artistId):
+    try:
+        trackcounts={}
+        tracks=getTrackFilesForArtist(artistId)
+        for album in albums:
+            trackcounts[album["id"]]=0
+        for track in tracks:
+            # if not track["albumId"] in trackcounts:
+            #     track["albumId"]=0
+            trackalbum = track["albumId"]
+            trackcounts[trackalbum] = trackcounts[trackalbum] +1
+        for album in albums:
+            if (trackcounts[album["id"]]==0):
+                print("** REMOVING album " + album["title"])
+                deleteAlbum(album["id"])
+            else:
+                print("keep album " + album["title"])
+        return trackcounts
+    except Exception as err:
+        print(f"Unexpected {err=}, {type(err)=}")
+        raise
+
 
 def getArtistAlbums(artistId):
     response = requests.get(prefix + "album?artistId=" + str(artistId),   headers=requestheaders)
