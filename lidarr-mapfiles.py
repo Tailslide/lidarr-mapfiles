@@ -233,15 +233,6 @@ for trackFile in unmappedFiles:
                                             bestfoundalbum["addOptions"] = { "searchForNewAlbum": False }
                                             print("Added album ", bestfoundalbum["title"])
                                             bestfoundalbum=addAlbum(bestfoundalbum)
-                            #             if (albumMatch and not artistmatch): matchstr ="**ALBUM MATCH** "
-                            #             if (not albumMatch and artistmatch): matchstr ="**ARTIST MATCH** "
-                            #             if (albumMatch and artistmatch): matchstr ="**MATCH** "
-                            #             if (albumMatch and artistmatch):
-
-print("Folders with unmatched files:")           
-for f in badfolders:
-    print(f)
-    subprocess.call(['explorer', PureWindowsPath(f)])
 
                             # if (MOVEUNKNOWNALBUMSTOSUBFOLDER is not None and MOVEUNKNOWNALBUMSTOSUBFOLDER != ""):
                             #     ufolder = os.path.join(fullalbumpath, "..", MOVEUNKNOWNALBUMSTOSUBFOLDER)
@@ -252,3 +243,7 @@ for f in badfolders:
                             #             os.mkdir(ufolder)
                             #         shutil.move(fullalbumpath, ufolder)
 
+# print("Folders with unmatched files:")           
+# for f in badfolders:
+#     print(f)
+#     subprocess.call(['explorer', PureWindowsPath(f)])
